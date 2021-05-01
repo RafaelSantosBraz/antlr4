@@ -1,7 +1,6 @@
 # Copyright (c) 2012-2017 The ANTLR Project. All rights reserved.
 # Use of this file is governed by the BSD 3-clause license that
 # can be found in the LICENSE.txt file in the project root.
-#
 
 # A token has properties: text, type, line, character position in the line
 # (so we can ignore tabs), token channel, index, and source from which
@@ -55,7 +54,7 @@ class CommonToken < Token
 
   # An empty {@link Pair} which is used as the default value of
   # {@link #source} for tokens that do not have a source.
-  EMPTY_SOURCE = [None, None]
+  EMPTY_SOURCE = [nil, nil]
 
   def initialize(source = EMPTY_SOURCE, type = nil, channel = DEFAULT_CHANNEL, start = -1, stop = -1)
     @source = source
