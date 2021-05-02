@@ -23,6 +23,8 @@ class TokenStream
 end
 
 class BufferedTokenStream < TokenStream
+  attr_accessor(:tokenSource, :tokens, :index, :fetchedEOF)
+
   def initialize(tokenSource)
     # The {@link TokenSource} from which tokens for this stream are fetched.
     @tokenSource = tokenSource
@@ -91,7 +93,7 @@ class BufferedTokenStream < TokenStream
       # not yet initialized
       skipEofCheck = false
     end
-    if not skipEofCheck and LA(1) == Token::EOF
+    if not skipEofCheck and lA(1) == Token::EOF
       raise IllegalStateException, "cannot consume EOF"
     end
     if sync(@index + 1)
@@ -111,7 +113,7 @@ class BufferedTokenStream < TokenStream
       fetched = fetch(n)
       return fetched >= n
     end
-    return true
+    true
   end
 
   # Add {@code n} elements to buffer.
@@ -145,26 +147,26 @@ class BufferedTokenStream < TokenStream
       break if t.type == Token::EOF
       subset << t if types.nil? or types.include?(t.type)
     }
-    return subset
+    subset
   end
 
-  def LA(i)
-    LT(i).type
+  def lA(i)
+    lT(i).type
   end
 
-  def LB(k)
+  def lB(k)
     return nil if (@index - k) < 0
     @tokens[@index - k]
   end
 
-  def LT(k)
+  def lT(k)
     lazyInit()
     return nil if k == 0
-    return LB(-k) if k < 0
+    return lB(-k) if k < 0
     i = @index + k - 1
     sync(i)
     return @tokens[@tokens.size - 1] if i >= @tokens.size
-    return @tokens[i]
+    @tokens[i]
   end
 
   # Allowed derived classes to modify the behavior of operations which change
@@ -213,7 +215,7 @@ class BufferedTokenStream < TokenStream
       sync(i)
       token = @tokens[i]
     end
-    return i
+    i
   end
 
   # Given a starting index, return the index of the previous token on channel.
@@ -223,7 +225,7 @@ class BufferedTokenStream < TokenStream
     while i >= 0 and @tokens[i].channel != channel
       i -= 1
     end
-    return i
+    i
   end
 
   # Collect all tokens on specified channel to the right of

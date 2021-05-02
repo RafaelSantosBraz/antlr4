@@ -24,6 +24,8 @@ end
 #  and what kind of problem occurred.
 
 class RecognitionException < Exception
+  attr_accessor(:message, :recognizer, :input, :ctx, :offendingToken, :offendingState)
+
   def initialize(message = nil, recognizer = nil, input = nil, ctx = nil)
     super(message)
     @message = message
@@ -65,6 +67,8 @@ class RecognitionException < Exception
 end
 
 class LexerNoViableAltException < RecognitionException
+  attr_accessor(:startIndex, :deadEndConfigs)
+
   def initialize(lexer, input, startIndex, deadEndConfigs)
     super(nil, lexer, input, nil)
     @startIndex = startIndex
@@ -118,6 +122,8 @@ end
 #  Disambiguating predicate evaluation occurs when we test a predicate during
 #  prediction.
 class FailedPredicateException < RecognitionException
+  attr_accessor(:ruleIndex, :predicateIndex, :predicate)
+
   def initialize(recognizer, predicate = nil, message = nil)
     super(formatMessage(predicate, message), recognizer, recognizer.getInputStream(), recognizer.ctx)
     s = recognizer.interp.atn.states[recognizer.state]
