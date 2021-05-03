@@ -6,7 +6,7 @@
 # (so we can ignore tabs), token channel, index, and source from which
 # we obtained this token.
 class Token
-  attr_accessor(:source, :type, :channel, :start, :stop, :tokenIndex, :line, :column, :text)
+  attr_accessor(:source, :type, :channel, :start, :stop, :token_index, :line, :column)
 
   INVALID_TYPE = 0
 
@@ -35,18 +35,26 @@ class Token
     @channel = nil # The parser ignores everything not on DEFAULT_CHANNEL
     @start = nil # optional; return -1 if not implemented.
     @stop = nil  # optional; return -1 if not implemented.
-    @tokenIndex = nil # from 0..n-1 of the token object in the input stream
+    @token_index = nil # from 0..n-1 of the token object in the input stream
     @line = nil # line=1..n of the 1st character
     @column = nil # beginning of the line at which it occurs, 0..n-1
-    @text = nil # text of the token.
+    @_text = nil # text of the token.
   end
 
-  def getTokenSource
+  def get_token_source
     @source[0]
   end
 
-  def getInputStream
+  def get_input_stream
     @source[1]
+  end
+
+  def text
+    @_text
+  end
+
+  def text=(text)
+    @_text = text
   end
 end
 
@@ -62,7 +70,7 @@ class CommonToken < Token
     @channel = channel
     @start = start
     @stop = stop
-    @tokenIndex = -1
+    @token_index = -1
     if not source[0].nil?
       @line = source[0].line
       @column = source[0].column
@@ -84,20 +92,20 @@ class CommonToken < Token
     #
     def clone
       t = CommonToken.new(@source, @type, @channel, @start, @stop)
-      t.tokenIndex = @tokenIndex
+      t.token_index = @token_index
       t.line = @line
       t.column = @column
-      t.text = @text
+      t.text = text()
       t
     end
 
     def text
-      return @text unless @text.nil?
-      input = getInputStream()
+      return @_text unless @_text.nil?
+      input = get_input_stream()
       return nil if input.nil?
       n = input.size
       if @start < n and @stop < n
-        return input.getText(@start, @stop)
+        return input.get_text(@start, @stop)
       else
         return "<EOF>"
       end
@@ -105,12 +113,12 @@ class CommonToken < Token
   end
 
   def to_s
-    txt = @text
+    txt = text()
     if not txt.nil?
       txt = txt.gsub(/\n/, "\\n").gsub(/\r/, "\\r").gsub(/\t/, "\\t")
     else
       txt = "<no text>"
     end
-    "[@#{@tokenIndex},#{@start}:#{@stop}='#{txt}',<#{@type}>#{@channel > 0 ? ",channel=#{@channel}" : ""},#{@line}:#{@column}]"
+    "[@#{@token_index},#{@start}:#{@stop}='#{txt}',<#{@type}>#{@channel > 0 ? ",channel=#{@channel}" : ""},#{@line}:#{@column}]"
   end
 end
