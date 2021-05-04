@@ -6,7 +6,8 @@
 # (so we can ignore tabs), token channel, index, and source from which
 # we obtained this token.
 class Token
-  attr_accessor(:source, :type, :channel, :start, :stop, :token_index, :line, :column)
+  attr_accessor(:source, :type, :channel, :start, :stop, :token_index, :line,
+                :column)
 
   INVALID_TYPE = 0
 
@@ -64,7 +65,8 @@ class CommonToken < Token
   # {@link #source} for tokens that do not have a source.
   EMPTY_SOURCE = [nil, nil]
 
-  def initialize(source = EMPTY_SOURCE, type = nil, channel = DEFAULT_CHANNEL, start = -1, stop = -1)
+  def initialize(source = EMPTY_SOURCE, type = nil, channel = DEFAULT_CHANNEL,
+                 start = -1, stop = -1)
     @source = source
     @type = type
     @channel = channel
