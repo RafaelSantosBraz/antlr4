@@ -6,3 +6,5 @@
 # encoding used to convert from int to str
 DECODE_ENCODING = Encoding::UTF_8
 
+# encoding used for reading files
+FILE_ENCODING = Encoding::UTF_8
