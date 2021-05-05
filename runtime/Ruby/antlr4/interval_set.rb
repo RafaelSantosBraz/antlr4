@@ -3,6 +3,7 @@
 # can be found in the LICENSE.txt file in the project root.
 
 require_relative "token"
+require_relative "utils"
 
 # stop is not included!
 class Interval
@@ -196,10 +197,10 @@ class IntervalSet
         if existing.start == Token::EOF
           names << "<EOF>"
         else
-          names << "'#{existing.start.chr(Encoding::UTF_8)}'"
+          names << "'#{existing.start.chr(DECODE_ENCODING)}'"
         end
       else
-        names << "'#{existing.start.chr(Encoding::UTF_8)}'..'#{(existing.stop - 1).chr(Encoding::UTF_8)}'"
+        names << "'#{existing.start.chr(DECODE_ENCODING)}'..'#{(existing.stop - 1).chr(DECODE_ENCODING)}'"
       end
     }
     return "{#{names.join(", ")}}" if names.size > 1
