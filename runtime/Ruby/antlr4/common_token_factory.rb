@@ -3,20 +3,28 @@
 # can be found in the LICENSE.txt file in the project root.
 #
 
-#
-# This default implementation of {@link TokenFactory} creates
-# {@link CommonToken} objects.
-#
-
-require_relative "Token"
+require_relative "token"
 
 class TokenFactory
 end
 
+#
+# This default implementation of {@link TokenFactory} creates
+# {@link CommonToken} objects.
+#
 class CommonTokenFactory < TokenFactory
-  attr_accessor(:copyText)
+  attr_accessor(:copy_text)
 
-  def initialize(copyText = false)
+  #
+  # The default {@link CommonTokenFactory} instance.
+  #
+  # <p>
+  # This token factory does not explicitly copy token text when constructing
+  # tokens.</p>
+  #
+  DEFAULT = CommonTokenFactory.new
+
+  def initialize(copy_text = false)
     # Indicates whether {@link CommonToken#setText} should be called after
     # constructing tokens to explicitly set the text. This is useful for cases
     # where the input stream might not be able to provide arbitrary substrings
@@ -31,7 +39,7 @@ class CommonTokenFactory < TokenFactory
     # The default value is {@code false} to avoid the performance and memory
     # overhead of copying text for every token unless explicitly requested.</p>
     #
-    @copyText = copyText
+    @copy_text = copy_text
   end
 
   def create(source, type, text, channel, start, stop, line, column)
@@ -41,23 +49,15 @@ class CommonTokenFactory < TokenFactory
     if not text.nil?
       t.text = text
     elsif @copyText and not source[1].nil?
-      t.text = source[1].getText(start, stop)
+      t.text = source[1].get_text(start, stop)
     end
     t
   end
 
-  def createThin(type, text)
-    t = CommonToken.new(CommonToken::EMPTY_SOURCE, type, CommonToken::DEFAULT_CHANNEL, -1, -1)
+  def create_thin(type, text)
+    t = CommonToken.new(CommonToken::EMPTY_SOURCE, type,
+                        CommonToken::DEFAULT_CHANNEL, -1, -1)
     t.text = text
     t
   end
 end
-
-#
-# The default {@link CommonTokenFactory} instance.
-#
-# <p>
-# This token factory does not explicitly copy token text when constructing
-# tokens.</p>
-#
-CommonTokenFactory::DEFAULT = CommonTokenFactory.new
