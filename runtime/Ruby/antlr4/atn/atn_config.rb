@@ -10,7 +10,8 @@ require "ostruct"
 
 class ATNConfig
   attr_accessor(:state, :alt, :context, :semantic_context,
-                :reaches_into_outer_context, :precedence_filter_suppressed)
+                :reaches_into_outer_context, :precedence_filter_suppressed,
+                :is_inside_set)
 
   # @param {Object} params A tuple: (ATN state, predicted alt, syntactic, semantic context). An OpenStruct object.
   # The syntactic context is a graph-structured stack node whose
@@ -45,6 +46,7 @@ class ATNConfig
     #/
     @reaches_into_outer_context = config.reaches_into_outer_context
     @precedence_filter_suppressed = config.reaches_into_outer_context
+    @is_inside_set = false
   end
 
   def self.check_params(params, is_cfg = nil)
@@ -71,7 +73,10 @@ class ATNConfig
   end
 
   def hash
-    [@state.state_number, @alt, @context, @semantic_context].hash
+    unless @is_inside_set
+      return [@state.state_number, @alt, @context, @semantic_context].hash
+    end
+    [@state.state_number, @alt, @semantic_context].hash
   end
 
   # An ATN configuration is equal to another if both have
@@ -79,20 +84,15 @@ class ATNConfig
   # syntactic/semantic contexts are the same
   #/
   def eql?(other)
-    return true if self == other
-    return false unless other.is_a? ATNConfig
-    @state.state_number == other.state.state_number and
-      @alt == other.alt and
-      (@context.nil? ? other.context.nil? : @context.eql?(other.context)) and
-      @semantic_context.eql?(other.semantic_context) and
-      @precedence_filter_suppressed == other.precedence_filter_suppressed
-  end
-
-  def hash_code_for_config_set
-    [@state.state_number, @alt, @semantic_context].hash
-  end
-
-  def eql_for_config_set?(other)
+    unless @is_inside_set
+      return true if self == other
+      return false unless other.is_a? ATNConfig
+      @state.state_number == other.state.state_number and
+        @alt == other.alt and
+        (@context.nil? ? other.context.nil? : @context.eql?(other.context)) and
+        @semantic_context.eql?(other.semantic_context) and
+        @precedence_filter_suppressed == other.precedence_filter_suppressed
+    end
     return true if self == other
     return false unless other.is_a? ATNConfig
     @state.state_number == other.state.state_number and
@@ -116,11 +116,17 @@ class LexerATNConfig < ATNConfig
     @passed_through_non_greedy_decision = config.nil? ? false : check_non_greedy_decision(config, @state)
   end
 
-  def hash_code_for_config_set
+  def hash
     [@state.state_number, @alt, @context, @semantic_context].hash
   end
 
-  def eql_for_config_set?(other)
+  def eql?(other)
+    unless @is_inside_set
+      return (self == other or (other.is_a? LexerATNConfig and
+                                @passed_through_non_greedy_decision == other.passed_through_non_greedy_decision and
+                                (@lexer_action_executor ? @lexer_action_executor.eql?(other.lexer_action_executor) : (not other.lexer_action_executor)) and
+                                super(other)))
+    end
     return true if self == other
     return false unless other.is_a? ATNConfig
     @state.state_number == other.state.state_number and
@@ -128,13 +134,6 @@ class LexerATNConfig < ATNConfig
       (@context.nil? ? other.context.nil? : @context.eql?(other.context)) and
       @semantic_context.eql?(other.semantic_context) and
       @precedence_filter_suppressed == other.precedence_filter_suppressed
-  end
-
-  def eql?(other)
-    self == other or (other.is_a? LexerATNConfig and
-                      @passed_through_non_greedy_decision == other.passed_through_non_greedy_decision and
-                      (@lexer_action_executor ? @lexer_action_executor.eql?(other.lexer_action_executor) : (not other.lexer_action_executor)) and
-                      super(other))
   end
 
   def check_non_greedy_decision(source, target)
