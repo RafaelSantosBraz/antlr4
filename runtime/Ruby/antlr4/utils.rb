@@ -26,4 +26,16 @@ class CustomSetForATNConfigSet < Set
     value.is_inside_set = false
     resp
   end
+
+  def find_eql(value)
+    value.is_inside_set = true
+    existing = find { |v|
+      v.is_inside_set = true
+      resp = v.eql? value
+      v.is_inside_set = false
+      resp
+    }
+    value.is_inside_set = false
+    existing
+  end
 end

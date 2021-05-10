@@ -62,14 +62,7 @@ class ATNConfigSet
     @dips_into_outer_context = true if config.reaches_into_outer_context > 0
     if @config_lookup.is_a? CustomSetForATNConfigSet
       if @config_lookup.include? config
-        config.is_inside_set = true
-        existing = @config_lookup.find { |v|
-          v.is_inside_set = true
-          resp = v.eql? config
-          v.is_inside_set = false
-          resp
-        }
-        config.is_inside_set = false
+        existing = @config_lookup.find_eql(config)
       else
         @config_lookup.add(config)
         existing = config

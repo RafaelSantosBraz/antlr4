@@ -4,6 +4,9 @@
 # can be found in the LICENSE.txt file in the project root.
 #/
 
+require_relative "buffered_token_stream"
+require_relative "token"
+
 #
 # This class extends {@link BufferedTokenStream} with functionality to filter
 # token streams to tokens on a particular channel (tokens where
@@ -28,11 +31,6 @@
 # such a rule will not be available as part of the token stream, regardless of
 # channel.</p>
 #/
-
-require_relative "BufferedTokenStream"
-require_relative "Lexer"
-require_relative "Token"
-
 class CommonTokenStream < BufferedTokenStream
   attr_accessor(:channel)
 
@@ -41,41 +39,41 @@ class CommonTokenStream < BufferedTokenStream
     @channel = channel
   end
 
-  def adjustSeekIndex(i)
-    nextTokenOnChannel(i, channel)
+  def adjust_seek_index(i)
+    next_token_on_channel(i, @channel)
   end
 
-  def lB(k)
+  def lb(k)
     return nil if k == 0 or (@index - k) < 0
     i = @index
     n = 1
     # find k good tokens looking backwards
     while n <= k
       # skip off-channel tokens
-      i = previousTokenOnChannel(i - 1, @channel)
+      i = previous_token_on_channel(i - 1, @channel)
       n += 1
     end
     return nil if i < 0
     @tokens[i]
   end
 
-  def lT(k)
-    lazyInit()
+  def lt(k)
+    lazy_init()
     return nil if k == 0
-    return lB(-k) if k < 0
+    return lb(-k) if k < 0
     i = @index
     n = 1 # we know tokens[pos] is a good one
     # find k good tokens
     while n < k
       # skip off-channel tokens, but make sure to not look past EOF
-      i = nextTokenOnChannel(i + 1, @channel) if sync(i + 1)
+      i = next_token_on_channel(i + 1, @channel) if sync(i + 1)
       n += 1
     end
     @tokens[i]
   end
 
   # Count EOF just once.#/
-  def getNumberOfOnChannelTokens
+  def get_number_of_on_channel_tokens
     n = 0
     fill()
     (0..(@tokens.size - 1)).each { |i|

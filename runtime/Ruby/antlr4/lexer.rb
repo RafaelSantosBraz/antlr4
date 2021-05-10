@@ -3,15 +3,12 @@
 # can be found in the LICENSE.txt file in the project root.
 #
 
-require_relative "CommonTokenFactory"
-require_relative "atn/LexerATNSimulator"
-require_relative "InputStream"
-require_relative "Recognizer"
-require_relative "Token"
-require_relative "error/Errors"
+require_relative "common_token_factory"
+require_relative "recognizer"
+require_relative "token"
+require_relative "error/errors"
 
-# Adapted from Python3 and JavaScript
-class TokenSource < Recognizer
+class TokenSource
 end
 
 # A lexer is recognizer that draws input symbols from a character stream.
@@ -19,8 +16,8 @@ end
 #  uses simplified match() and error recovery mechanisms in the interest
 #  of speed.
 #/
-class Lexer < TokenSource
-  attr_accessor(:input, :output, :factory, :tokenFactorySourcePair, :token, :tokenStartCharIndex, :tokenStartLine, :tokenStartColumn, :hitEOF, :channel, :type, :modeStack, :mode, :text)
+class Lexer < Recognizer
+  attr_accessor(:output)
 
   DEFAULT_MODE = 0
   MORE = -2
@@ -32,11 +29,11 @@ class Lexer < TokenSource
   MAX_CHAR_VALUE = 0x10FFFF
 
   def initialize(input, output = STDOUT)
-    @input = input
+    @_input = input
     @output = output
-    @factory = CommonTokenFactory::DEFAULT
-    @tokenFactorySourcePair = [self, input]
-    @interp = nil # child classes must populate this
+    @_factory = CommonTokenFactory::DEFAULT
+    @_token_factory_source_pair = [self, input]
+    @_interp = nil # child classes must populate this
     # The goal of all lexer rules/methods is to create a token object.
     #  self is an instance variable as multiple rules may collaborate to
     #  create a single token.  nextToken will return self object after
@@ -44,93 +41,93 @@ class Lexer < TokenSource
     #  emissions, then set self to the last token to be matched or
     #  something nonnull so that the auto token emit mechanism will not
     #  emit another token.
-    @token = nil
+    @_token = nil
     # What character index in the stream did the current token start at?
     #  Needed, for example, to get the text for current token.  Set at
     #  the start of nextToken.
-    @tokenStartCharIndex = -1
+    @_token_start_char_index = -1
     # The line on which the first character of the token resides#/
-    @tokenStartLine = -1
+    @_token_start_line = -1
     # The character position of first character within the line#/
-    @tokenStartColumn = -1
+    @_token_start_column = -1
     # Once we see EOF on char stream, next token will be EOF.
     #  If you have DONE : EOF ; then you see DONE EOF.
-    @hitEOF = false
+    @_hit_EOF = false
     # The channel number for the current token#/
-    @channel = Token::DEFAULT_CHANNEL
+    @_channel = Token::DEFAULT_CHANNEL
     # The token type for the current token#/
-    @type = Token::INVALID_TYPE
-    @modeStack = []
-    @mode = DEFAULT_MODE
+    @_type = Token::INVALID_TYPE
+    @_mode_stack = []
+    @_mode = DEFAULT_MODE
     # You can set the text for the current token to override what is in
     #  the input char buffer.  Use setText() or can set self instance var.
     #/
-    @text = nil
+    @_text = nil
   end
 
   def reset
     # wack Lexer state variables
-    @input.seek(0) unless @input.nil?
-    @token = nil
-    @type = Token::INVALID_TYPE
-    @channel = Token::DEFAULT_CHANNEL
-    @tokenStartCharIndex = -1
-    @tokenStartColumn = -1
-    @tokenStartLine = -1
-    @text = nil
-    @hitEOF = false
-    @mode = Lexer::DEFAULT_MODE
-    @modeStack = []
-    @interp.reset()
+    @_input.seek(0) unless @_input.nil?
+    @_token = nil
+    @_type = Token::INVALID_TYPE
+    @_channel = Token::DEFAULT_CHANNEL
+    @_token_start_char_index = -1
+    @_token_start_column = -1
+    @_token_start_line = -1
+    @_text = nil
+    @_hit_EOF = false
+    @_mode = Lexer::DEFAULT_MODE
+    @_mode_stack = []
+    @_interp.reset()
   end
 
   # Return a token from self source; i.e., match a token on the char
   #  stream.
-  def nextToken
-    if @input.nil?
-      raise IllegalStateException, "nextToken requires a non-null input stream."
+  def next_token
+    if @_input.nil?
+      raise Exception, "next_token requires a non-null input stream."
     end
     # Mark start location in char stream so unbuffered streams are
     # guaranteed at least have text of current token
-    tokenStartMarker = @input.mark()
+    token_start_marker = @_input.mark()
     begin
       while true
-        if @hitEOF
-          emitEOF()
-          return @token
+        if @_hit_EOF
+          emit_EOF()
+          return @_token
         end
-        @token = nil
-        @channel = Token::DEFAULT_CHANNEL
-        @tokenStartCharIndex = @input.index
-        @tokenStartColumn = @interp.column
-        @tokenStartLine = @interp.line
-        @text = nil
-        continueOuter = false
+        @_token = nil
+        @_channel = Token::DEFAULT_CHANNEL
+        @_token_start_char_index = @_input.index
+        @_token_start_column = @_interp.column
+        @_token_start_line = @_interp.line
+        @_text = nil
+        continue_outer = false
         while true
-          @type = Token::INVALID_TYPE
+          @_type = Token::INVALID_TYPE
           ttype = SKIP
           begin
-            ttype = @interp.match(@input, @mode)
-          rescue LexerNoViableAltException => e
-            notifyListeners(e) # report error
+            ttype = @_interp.match(@_input, @_mode)
+          rescue RecognitionException => e
+            notify_listeners(e) # report error
             recover(e)
           end
-          @hitEOF = true if @input.lA(1) == Token::EOF
-          @type = ttype if @type == Token::INVALID_TYPE
-          if @type == SKIP
-            continueOuter = true
+          @_hit_EOF = true if @_input.la(1) == Token::EOF
+          @_type = ttype if @_type == Token::INVALID_TYPE
+          if @_type == SKIP
+            continue_outer = true
             break
           end
-          break if @type != MORE
+          break if @_type != MORE
         end
-        next if continueOuter
-        emit() if @token.nil?
-        return @token
+        next if continue_outer
+        emit() if @_token.nil?
+        return @_token
       end
     ensure
       # make sure we release marker after match or
       # unbuffered char stream will keep buffering
-      @input.release(tokenStartMarker)
+      @_input.release(token_start_marker)
     end
   end
 
@@ -141,42 +138,46 @@ class Lexer < TokenSource
   #  and emits it.
   #/
   def skip
-    @type = SKIP
+    @_type = SKIP
   end
 
   def more
-    @type == MORE
+    @_type == MORE
   end
 
-  def pushMode(m)
-    @output.puts("pushMode #{m}") if @interp.debug
-    @modeStack << @mode
-    @mode = m
+  def mode(m)
+    @_mode = m
   end
 
-  def popMode
-    if @modeStack.size == 0
+  def push_mode(m)
+    @output.puts("pushMode #{m}") if @_interp.debug
+    @_mode_stack << @_mode
+    @_mode = m
+  end
+
+  def pop_mode
+    if @_mode_stack.size == 0
       raise Exception, "Empty Stack"
     end
-    @output.puts("popMode back to #{@modeStack[0..-1]}") if @interp.debug
-    @mode = @modeStack.pop()
+    @output.puts("popMode back to #{@_mode_stack[0..-1]}") if @_interp.debug
+    @_mode = @_mode_stack.pop()
+  end
+
+  def input_stream
+    @_input
   end
 
   # Set the char stream and reset the lexer#/
-  def inputStream
-    @input
-  end
-
-  def inputStream=(input)
-    @input = nil
-    @tokenFactorySourcePair = [self, @input]
+  def input_stream(input)
+    @_input = nil
+    @_token_factory_source_pair = [self, @_input]
     reset()
-    @input = input
-    @tokenFactorySourcePair = [self, @input]
+    @_input = input
+    @_token_factory_source_pair = [self, @_input]
   end
 
-  def sourceName
-    @input.sourceName
+  def source_name
+    @_input.source_name
   end
 
   # By default does not support multiple emits per nextToken invocation
@@ -184,8 +185,8 @@ class Lexer < TokenSource
   #  and getToken (to push tokens into a list and pull from that list
   #  rather than a single variable as self implementation does).
   #/
-  def emitToken(token)
-    @token = token
+  def emit_token(token)
+    @_token = token
   end
 
   # The standard method called to automatically emit a token at the
@@ -195,81 +196,98 @@ class Lexer < TokenSource
   #  custom Token objects or provide a new factory.
   #/
   def emit
-    t = @factory.create(@tokenFactorySourcePair, @type, @text, @channel, @tokenStartCharIndex, getCharIndex() - 1, @tokenStartLine, @tokenStartColumn)
-    emitToken(t)
+    t = @_factory.create(@_token_factory_source_pair, @_type, @_text,
+                         @_channel, @_token_start_char_index, get_char_index() - 1,
+                         @_token_start_line, @_token_start_column)
+    emit_token(t)
     t
   end
 
-  def emitEOF
+  def emit_EOF
     cpos = column()
     lpos = line()
-    eof = @factory.create(@tokenFactorySourcePair, Token::EOF, nil, Token::DEFAULT_CHANNEL, @input.index, @input.index - 1, lpos, cpos)
-    emitToken(eof)
+    eof = @_factory.create(@_token_factory_source_pair, Token::EOF, nil,
+                           Token::DEFAULT_CHANNEL, @_input.index,
+                           @_input.index - 1, lpos, cpos)
+    emit_token(eof)
     eof
   end
 
+  def type
+    @_type
+  end
+
+  def type=(type)
+    @_type = type
+  end
+
   def column
-    @interp.column
+    @_interp.column
   end
 
   def column=(column)
-    @interp.column = column
+    @_interp.column = column
   end
 
   def line
-    @interp.line
+    @_interp.line
   end
 
   def line=(line)
-    @interp.line = line
+    @_interp.line = line
   end
 
   # What is the index of the current character of lookahead?#/
-  def getCharIndex
-    @input.index
+  def get_char_index
+    @_input.index
   end
 
   # Return the text matched so far for the current token or any
   #  text override.
   def text
-    if not @text.nil?
-      return @text
+    if not @_text.nil?
+      return @_text
     else
-      return @interp.getText(@input)
+      return @_interp.get_text(@_input)
     end
+  end
+
+  def text=(text)
+    @_text = text
   end
 
   # Return a list of all Token objects in input char stream.
   #  Forces load of all tokens. Does not include EOF token.
   #/
-  def getAllTokens
+  def get_all_tokens
     tokens = []
-    t = nextToken()
+    t = next_token()
     while t.type != Token::EOF
       tokens << t
-      t = nextToken()
+      t = next_token()
     end
     tokens
   end
 
-  def notifyListeners(e)
-    start = @tokenStartCharIndex
-    stop = @input.index
-    text = @input.getText(start, stop)
-    msg = "token recognition error at: '#{getErrorDisplay(txt)}'"
-    listener = getErrorListenerDispatch()
-    listener.syntaxError(self, nil, @tokenStartLine, @tokenStartColumn, msg, e)
+  def notify_listeners(e)
+    start = @_token_start_char_index
+    stop = @_input.index
+    text = @_input.get_text(start, stop)
+    msg = "token recognition error at: '#{get_error_display(txt)}'"
+    listener = get_error_listener_dispatch()
+    listener.syntax_error(self, nil, @_token_start_line, @_token_start_column,
+                          msg, e)
   end
 
-  def getErrorDisplay(s)
+  def get_error_display(s)
     buf = ""
     s.each_char { |c|
-      buf << getErrorDisplayForChar(c)
+      buf << get_error_display_for_char(c)
     }
     buf
   end
 
-  def getErrorDisplayForChar(c)
+  def get_error_display_for_char(c)
     if c[0].ord == Token::EOF
       return "<EOF>"
     elsif c == "\n"
@@ -283,8 +301,8 @@ class Lexer < TokenSource
     end
   end
 
-  def getCharErrorDisplay(c)
-    "'#{getErrorDisplayForChar(c)}'"
+  def get_char_error_display(c)
+    "'#{get_error_display_for_char(c)}'"
   end
 
   # Lexers can normally match any char in it's vocabulary after matching
@@ -293,13 +311,13 @@ class Lexer < TokenSource
   #  to do sophisticated error recovery if you are in a fragment rule.
   #/
   def recover(re)
-    if @input.lA(1) != Token::EOF
+    if @_input.la(1) != Token::EOF
       if re.is_a? LexerNoViableAltException
         # skip a char and try again
-        @interp.consume(@input)
+        @_interp.consume(@_input)
       else
         # TODO: Do we lose character or line position information?
-        @input.consume()
+        @_input.consume()
       end
     end
   end

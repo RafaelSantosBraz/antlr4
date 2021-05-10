@@ -3,6 +3,14 @@
 # can be found in the LICENSE.txt file in the project root.
 #
 
+require_relative "token"
+require_relative "lexer"
+require_relative "interval_set"
+
+# this is just to keep meaningful parameter types to Parser
+class TokenStream
+end
+
 # This implementation of {@link TokenStream} loads tokens from a
 # {@link TokenSource} on-demand, and places the tokens in a buffer to provide
 # access to any previous token by index.
@@ -13,21 +21,12 @@
 # channel, such as {@link Token#DEFAULT_CHANNEL} or
 # {@link Token#HIDDEN_CHANNEL}, use a filtering token stream such a
 # {@link CommonTokenStream}.</p>
-
-require_relative "Token"
-require_relative "error/Errors"
-require_relative "Lexer"
-
-# this is just to keep meaningful parameter types to Parser
-class TokenStream
-end
-
 class BufferedTokenStream < TokenStream
-  attr_accessor(:tokenSource, :tokens, :index, :fetchedEOF)
+  attr_accessor(:token_source, :tokens, :index, :fetched_EOF)
 
-  def initialize(tokenSource)
+  def initialize(token_source)
     # The {@link TokenSource} from which tokens for this stream are fetched.
-    @tokenSource = tokenSource
+    @token_source = token_source
     # A collection of all tokens fetched from the token source. The list is
     # considered a complete view of the input once {@link #fetchedEOF} is set
     # to {@code true}.
@@ -53,7 +52,7 @@ class BufferedTokenStream < TokenStream
     # <li>{@link #fetch}: The check to prevent adding multiple EOF symbols into
     # {@link #tokens} is trivial with this field.</li>
     # <ul>
-    @fetchedEOF = false
+    @fetched_EOF = false
   end
 
   def mark
@@ -74,30 +73,30 @@ class BufferedTokenStream < TokenStream
   end
 
   def get(index)
-    lazyInit()
+    lazy_init()
     @tokens[index]
   end
 
   def consume
-    skipEofCheck = false
+    skip_eof_check = false
     if @index > 0
-      if @fetchedEOF
+      if @fetched_EOF
         # the last token in tokens is EOF. skip check if p indexes any
         # fetched token except the last.
-        skipEofCheck = @index < @tokens.size - 1
+        skip_eof_check = @index < @tokens.size - 1
       else
         # no EOF token in tokens. skip check if p indexes a fetched token.
-        skipEofCheck = @index < @tokens.size
+        skip_eof_check = @index < @tokens.size
       end
     else
       # not yet initialized
-      skipEofCheck = false
+      skip_eof_check = false
     end
-    if not skipEofCheck and lA(1) == Token::EOF
-      raise IllegalStateException, "cannot consume EOF"
+    if not skip_eof_check and la(1) == Token::EOF
+      raise Exception, "cannot consume EOF"
     end
     if sync(@index + 1)
-      @index = adjustSeekIndex(@index + 1)
+      @index = adjust_seek_index(@index + 1)
     end
   end
 
@@ -108,7 +107,7 @@ class BufferedTokenStream < TokenStream
   # @see #get(int i)
   #/
   def sync(i)
-    n = i - @tokens.size # how many more elements we need?
+    n = i - @tokens.size + 1 # how many more elements we need?
     if n > 0
       fetched = fetch(n)
       return fetched >= n
@@ -121,13 +120,13 @@ class BufferedTokenStream < TokenStream
   # @return The actual number of elements added to the buffer.
   #/
   def fetch(n)
-    return 0 if @fetchedEOF
+    return 0 if @fetched_EOF
     (0..(n - 1)).each { |i|
-      t = @tokenSource.nextToken()
-      t.tokenIndex = @tokens.size
+      t = @token_source.next_token()
+      t.token_index = @tokens.size
       @tokens << t
       if t.type == Token::EOF
-        @fetchedEOF = true
+        @fetched_EOF = true
         return i + 1
       end
     }
@@ -135,9 +134,9 @@ class BufferedTokenStream < TokenStream
   end
 
   # Get all tokens from start..stop inclusively#/
-  def getTokens(start, stop, types)
+  def get_tokens(start, stop, types = nil)
     return nil if start < 0 or stop < 0
-    lazyInit()
+    lazy_init()
     subset = []
     if stop >= @tokens.size
       stop = @tokens.size - 1
@@ -150,22 +149,22 @@ class BufferedTokenStream < TokenStream
     subset
   end
 
-  def lA(i)
-    lT(i).type
+  def la(i)
+    lt(i).type
   end
 
-  def lB(k)
+  def lb(k)
     return nil if (@index - k) < 0
     @tokens[@index - k]
   end
 
-  def lT(k)
-    lazyInit()
+  def lt(k)
+    lazy_init()
     return nil if k == 0
-    return lB(-k) if k < 0
+    return lb(-k) if k < 0
     i = @index + k - 1
     sync(i)
-    return @tokens[@tokens.size - 1] if i >= @tokens.size
+    return @tokens[-1] if i >= @tokens.size
     @tokens[i]
   end
 
@@ -180,32 +179,32 @@ class BufferedTokenStream < TokenStream
   #
   # @param i The target token index.
   # @return The adjusted target token index.
-  def adjustSeekIndex(i)
+  def adjust_seek_index(i)
     i
   end
 
-  def lazyInit
+  def lazy_init
     setup() if @index == -1
   end
 
   def setup
     sync(0)
-    @index = adjustSeekIndex(0)
+    @index = adjust_seek_index(0)
   end
 
   # Reset this token stream by setting its token source.#/
-  def setTokenSource(tokenSource)
-    @tokenSource = tokenSource
+  def set_token_source(token_source)
+    @token_source = token_source
     @tokens = []
     @index = -1
-    @fetchedEOF = false
+    @fetched_EOF = false
   end
 
   # Given a starting index, return the index of the next token on channel.
   #  Return i if tokens[i] is on channel.  Return -1 if there are no tokens
   #  on channel between i and EOF.
   #/
-  def nextTokenOnChannel(i, channel)
+  def next_token_on_channel(i, channel)
     sync(i)
     return -1 if i >= @tokens.size
     token = @tokens[i]
@@ -221,7 +220,7 @@ class BufferedTokenStream < TokenStream
   # Given a starting index, return the index of the previous token on channel.
   #  Return i if tokens[i] is on channel. Return -1 if there are no tokens
   #  on channel between i and 0.
-  def previousTokenOnChannel(i, channel)
+  def previous_token_on_channel(i, channel)
     while i >= 0 and @tokens[i].channel != channel
       i -= 1
     end
@@ -231,25 +230,25 @@ class BufferedTokenStream < TokenStream
   # Collect all tokens on specified channel to the right of
   #  the current token up until we see a token on DEFAULT_TOKEN_CHANNEL or
   #  EOF. If channel is -1, find any non default channel token.
-  def getHiddenTokensToRight(tokenIndex, channel)
-    lazyInit()
-    if tokenIndex < 0 or tokenIndex >= @tokens.size
-      raise Exception, "#{tokenIndex} not in 0..#{@tokens.size - 1}"
+  def get_hidden_tokens_to_right(token_index, channel = -1)
+    lazy_init()
+    if token_index < 0 or token_index >= @tokens.size
+      raise Exception, "#{token_index} not in 0..#{@tokens.size - 1}"
     end
-    nextOnChannel = nextTokenOnChannel(tokenIndex + 1, Lexer::DEFAULT_TOKEN_CHANNEL)
-    from_ = tokenIndex + 1
+    next_on_channel = next_token_on_channel(token_index + 1, Lexer::DEFAULT_TOKEN_CHANNEL)
+    from_ = token_index + 1
     # if none onchannel to right, nextOnChannel=-1 so set to = last token
     if nextOnChannel == -1
       to = @tokens.size - 1
     else
-      to = nextOnChannel
+      to = next_on_channel
     end
-    filterForChannel(from_, to, channel)
+    filter_for_channel(from_, to, channel)
   end
 
-  def filterForChannel(left, right, channel)
+  def filter_for_channel(left, right, channel)
     hidden = []
-    (left..(right + 1)).each { |i|
+    (left..right).each { |i|
       t = @tokens[i]
       if channel == -1
         hidden << t if t.channel != Lexer::DEFAULT_TOKEN_CHANNEL
@@ -261,25 +260,29 @@ class BufferedTokenStream < TokenStream
     hidden
   end
 
-  def getSourceName
-    @tokenSource.getSourceName()
+  def get_source_name
+    @token_source.get_source_name()
   end
 
   # Get the text of all tokens in this buffer.#/
-  def getText(start, stop)
-    lazyInit()
+  def get_text(interval = nil)
+    lazy_init()
     fill()
-    if start.is_a? Token
-      start = start.tokenIndex
-    elsif start.nil?
-      start = 0
+    if interval.nil?
+      interval = Interval.new(0, @tokens.size - 1)
     end
+    start = interval.start
+    if start.is_a? Token
+      start = start.token_index
+    end
+    stop = interval.stop
     if stop.is_a? Token
-      stop = stop.tokenIndex
-    elsif stop.nil? or stop >= @tokens.size
+      stop = stop.token_index
+    end
+    return "" if start.nil? or stop.nil? or start < 0 or stop < 0 or stop < start
+    if stop >= @tokens.size
       stop = @tokens.size - 1
     end
-    return "" if start < 0 or stop < 0 or stop < start
     s = ""
     (start..stop).each { |i|
       t = @tokens[i]
@@ -291,7 +294,7 @@ class BufferedTokenStream < TokenStream
 
   # Get all tokens from lexer until EOF#/
   def fill
-    lazyInit()
+    lazy_init()
     while fetch(1000) == 1000
       next
     end

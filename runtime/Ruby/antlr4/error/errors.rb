@@ -3,19 +3,8 @@
 # can be found in the LICENSE.txt file in the project root.
 #
 
-require_relative "../InputStream"
-require_relative "../ParserRuleContext"
-require_relative "../Recognizer"
-require_relative "../atn/Transition"
-
-class UnsupportedOperationException < Exception
-end
-
-class IllegalStateException < Exception
-end
-
-class CancellationException < IllegalStateException
-end
+require_relative "../interval_set"
+require_relative "../atn/transition"
 
 # The root of the ANTLR exception hierarchy. In general, ANTLR tracks just
 #  3 kinds of errors: prediction errors, failed predicate errors, and
@@ -24,7 +13,8 @@ end
 #  and what kind of problem occurred.
 
 class RecognitionException < Exception
-  attr_accessor(:message, :recognizer, :input, :ctx, :offendingToken, :offendingState)
+  attr_accessor(:message, :recognizer, :input, :ctx, :offending_token,
+                :offending_state)
 
   def initialize(message = nil, recognizer = nil, input = nil, ctx = nil)
     super(message)
@@ -35,14 +25,14 @@ class RecognitionException < Exception
     # The current {@link Token} when an error occurred. Since not all streams
     # support accessing symbols by index, we have to track the {@link Token}
     # instance itself.
-    @offendingToken = nil
+    @offending_token = nil
     # Get the ATN state number the parser was in at the time the error
     # occurred. For {@link NoViableAltException} and
     # {@link LexerNoViableAltException} exceptions, this is the
     # {@link DecisionState} number. For others, it is the state whose outgoing
     # edge we couldn't match.
-    @offendingState = -1
-    @offendingState = recognizer.state unless recognizer.nil?
+    @offending_state = -1
+    @offending_state = recognizer.state unless recognizer.nil?
   end
 
   # <p>If the state number is not known, this method returns -1.</p>
@@ -57,28 +47,32 @@ class RecognitionException < Exception
   # @return The set of token types that could potentially follow the current
   # state in the ATN, or {@code null} if the information is not available.
   #/
-  def getExpectedTokens
+  def get_expected_tokens
     if not @recognizer.nil?
-      return @recognizer.atn.getExpectedTokens(@offendingState, @ctx)
-    else
-      return nil
+      return @recognizer.atn.get_expected_tokens(@offending_state, @ctx)
     end
+    nil
+  end
+
+  # <p>If the state number is not known, this method returns -1.</p>
+  def to_s
+    @message
   end
 end
 
 class LexerNoViableAltException < RecognitionException
-  attr_accessor(:startIndex, :deadEndConfigs)
+  attr_accessor(:start_index, :dead_end_configs)
 
-  def initialize(lexer, input, startIndex, deadEndConfigs)
-    super(nil, lexer, input, nil)
-    @startIndex = startIndex
-    @deadEndConfigs = deadEndConfigs
+  def initialize(lexer, input, start_index, dead_end_configs)
+    super("", lexer, input, nil)
+    @start_index = start_index
+    @dead_end_configs = dead_end_configs
   end
 
   def to_s
     symbol = ""
-    if @startIndex >= 0 and @startIndex < @input.size
-      symbol = @input.getText(@startIndex, @startIndex)
+    if @start_index >= 0 and @start_index < @input.size
+      symbol = @input.get_text(Interval.new(@start_index, @start_index))
     end
     "LexerNoViableAltException('#{symbol}')"
   end
@@ -90,20 +84,24 @@ end
 #  in the various paths when the error. Reported by reportNoViableAlternative()
 #
 class NoViableAltException < RecognitionException
-  def initialize(recognizer, input = nil, startToken = nil, offendingToken = nil, deadEndConfigs = nil, ctx = nil)
+  attr_accessor(:dead_end_configs)
+
+  def initialize(recognizer, input = nil, start_token = nil,
+                             offending_token = nil, dead_end_configs = nil,
+                             ctx = nil)
     ctx = recognizer.ctx if ctx.nil?
-    offendingToken = recognizer.getCurrentToken() if offendingToken.nil?
-    startToken = recognizer.getCurrentToken() if startToken.nil?
-    input = recognizer.getInputStream() if input.nil?
-    super(nil, recognizer, input, ctx)
+    offending_token = recognizer.get_current_token() if offending_token.nil?
+    start_token = recognizer.get_current_token() if start_token.nil?
+    input = recognizer.get_input_stream() if input.nil?
+    super("", recognizer, input, ctx)
     # Which configurations did we try at input.index() that couldn't match input.LT(1)?#
-    @deadEndConfigs = deadEndConfigs
+    @dead_end_configs = dead_end_configs
     # The token object at the start index; the input stream might
     # 	not be buffering tokens so get a reference to it. (At the
     #  time the error occurred, of course the stream needs to keep a
     #  buffer all of the tokens but later we might not have access to those.)
-    @startToken = startToken
-    @offendingToken = offendingToken
+    @start_token = start_token
+    @offending_token = offending_token
   end
 end
 
@@ -112,8 +110,8 @@ end
 #
 class InputMismatchException < RecognitionException
   def initialize(recognizer)
-    super(nil, recognizer, recognizer.getInputStream(), recognizer.ctx)
-    @offendingToken = recognizer.getCurrentToken()
+    super("", recognizer, recognizer.get_input_stream(), recognizer.ctx)
+    @offending_token = recognizer.get_current_token()
   end
 end
 
@@ -122,31 +120,31 @@ end
 #  Disambiguating predicate evaluation occurs when we test a predicate during
 #  prediction.
 class FailedPredicateException < RecognitionException
-  attr_accessor(:ruleIndex, :predicateIndex, :predicate)
+  attr_accessor(:rule_index, :predicate_index, :predicate)
 
   def initialize(recognizer, predicate = nil, message = nil)
-    super(formatMessage(predicate, message), recognizer, recognizer.getInputStream(), recognizer.ctx)
+    super(format_message(predicate, message), recognizer,
+          recognizer.get_input_stream(), recognizer.ctx)
     s = recognizer.interp.atn.states[recognizer.state]
     trans = s.transitions[0]
     if trans.is_a? PredicateTransition
-      @ruleIndex = trans.ruleIndex
-      @predicateIndex = trans.predIndex
+      @rule_index = trans.rule_index
+      @predicate_index = trans.pred_index
     else
-      @ruleIndex = 0
-      @predicateIndex = 0
+      @rule_index = 0
+      @predicate_index = 0
     end
     @predicate = predicate
-    @offendingToken = recognizer.getCurrentToken()
+    @offending_token = recognizer.get_current_token()
   end
 
-  def formatMessage(predicate, message)
+  def format_message(predicate, message)
     if not message.nil?
       return message
-    else
-      return "failed predicate: {#{predicate}}?"
     end
+    "failed predicate: {#{predicate}}?"
   end
 end
 
-class ParseCancellationException < CancellationException
+class ParseCancellationException < Exception
 end
