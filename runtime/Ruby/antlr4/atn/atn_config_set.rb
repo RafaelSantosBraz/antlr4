@@ -61,7 +61,19 @@ class ATNConfigSet
     @has_semantic_context = true if config.semantic_context != SemanticContext::NONE
     @dips_into_outer_context = true if config.reaches_into_outer_context > 0
     if @config_lookup.is_a? CustomSetForATNConfigSet
-      existing = @config_lookup.add(config)
+      if @config_lookup.include? config
+        config.is_inside_set = true
+        existing = @config_lookup.find { |v|
+          v.is_inside_set = true
+          resp = v.eql? config
+          v.is_inside_set = false
+          resp
+        }
+        config.is_inside_set = false
+      else
+        @config_lookup.add(config)
+        existing = config
+      end
     else
       if @config_lookup.include? config
         existing = @config_lookup.find { |v| v.eql? config }
@@ -139,10 +151,7 @@ class ATNConfigSet
 
   def contains?(item)
     raise(Exception, "This method is not implemented for readonly sets.") if @config_lookup.nil?
-    prev = item.is_inside_set
-    item.is_inside_set = true
     @config_lookup.include? item
-    item.is_inside_set = prev
   end
 
   def clear

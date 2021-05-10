@@ -11,13 +11,19 @@ DECODE_ENCODING = Encoding::UTF_8
 # encoding used for reading files
 FILE_ENCODING = Encoding::UTF_8
 
+# custom Set to handle @is_inside_set of ATNConfig
 class CustomSetForATNConfigSet < Set
   def add(value)
     value.is_inside_set = true
-    if self.include? value
-      return self.find { |v| v.eql? value }
-    end
     super(value)
-    value
+    value.is_inside_set = false
+    self
+  end
+
+  def include?(value)
+    value.is_inside_set = true
+    resp = super(value)
+    value.is_inside_set = false
+    resp
   end
 end
