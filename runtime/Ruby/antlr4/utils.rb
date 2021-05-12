@@ -39,3 +39,9 @@ class CustomSetForATNConfigSet < Set
     existing
   end
 end
+
+def init_array(size, value)
+  tmp = []
+  tmp[size - 1] = value
+  tmp
+end
