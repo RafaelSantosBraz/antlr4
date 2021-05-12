@@ -117,11 +117,11 @@ class ATN
     raise(Exception, "Invalid state number.") if state_number < 0 or state_number >= @states.size
     s = @states[state_number]
     following = next_tokens(s)
-    return following unless following.contains?(Token::EPSILON)
+    return following unless following.include?(Token::EPSILON)
     expected = IntervalSet.new()
     expected.add_set(following)
     expected.remove_one(Token::EPSILON)
-    while not ctx.nil? and ctx.invoking_state >= 0 and following.contains?(Token::EPSILON)
+    while not ctx.nil? and ctx.invoking_state >= 0 and following.include?(Token::EPSILON)
       invoking_state = @states[ctx.invoking_state]
       rt = invoking_state.transitions[0]
       following = next_tokens(rt.follow_state)
@@ -129,7 +129,7 @@ class ATN
       expected.remove_one(Token::EPSILON)
       ctc = ctx.parent_ctx
     end
-    expected.add_one(Token::EOF) if following.contains?(Token::EPSILON)
+    expected.add_one(Token::EOF) if following.include?(Token::EPSILON)
     expected
   end
 end

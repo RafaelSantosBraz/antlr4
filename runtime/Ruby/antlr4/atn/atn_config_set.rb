@@ -142,7 +142,7 @@ class ATNConfigSet
     @configs.empty?
   end
 
-  def contains?(item)
+  def include?(item)
     raise(Exception, "This method is not implemented for readonly sets.") if @config_lookup.nil?
     @config_lookup.include? item
   end

@@ -18,7 +18,7 @@ class Interval
     Interval.new(@start, @stop)
   end
 
-  def contains?(item)
+  def include?(item)
     item >= @start and item < @stop
   end
 
@@ -111,10 +111,10 @@ class IntervalSet
     result
   end
 
-  def contains?(item)
+  def include?(item)
     return false if @intervals.nil?
     (0..(@intervals.size - 1)).each { |k|
-      return true if @intervals[k].contains?(item)
+      return true if @intervals[k].include?(item)
     }
     return false
   end
