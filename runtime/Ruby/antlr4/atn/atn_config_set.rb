@@ -61,12 +61,7 @@ class ATNConfigSet
     @has_semantic_context = true if config.semantic_context != SemanticContext::NONE
     @dips_into_outer_context = true if config.reaches_into_outer_context > 0
     if @config_lookup.is_a? CustomSetForATNConfigSet
-      if @config_lookup.include? config
-        existing = @config_lookup.find_eql(config)
-      else
-        @config_lookup.add(config)
-        existing = config
-      end
+      existing = @config_lookup.add(config)
     else
       if @config_lookup.include? config
         existing = @config_lookup.find { |v| v.eql? config }
@@ -176,6 +171,6 @@ end
 
 class OrderedATNConfigSet < ATNConfigSet
   def initialize
-    @config_lookup = Set[]
+    @config_lookup = Set.new
   end
 end

@@ -6,6 +6,7 @@
 require_relative "../dfa/dfa_state"
 require_relative "atn_config_set"
 require_relative "../prediction_context"
+require_relative "../utils"
 
 class ATNSimulator
 
@@ -41,7 +42,7 @@ class ATNSimulator
 
   def get_cached_context(context)
     return context if @shared_context_cache.nil?
-    visited = {}
+    visited = Map.new
     get_cached_predicton_context(context, @shared_context_cache, visited)
   end
 end
